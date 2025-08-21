@@ -170,19 +170,79 @@ router.put('/:id', authMiddleware, async (req: AuthRequest, res) => {
   }
 })
 
+// Test endpoint to check if delete is working
+router.get('/test-delete/:id', authMiddleware, async (req: AuthRequest, res) => {
+  try {
+    console.log('Testing delete for event:', req.params.id)
+    console.log('User ID:', req.user!.id)
+    
+    // Check if the event exists and user owns it
+    const { data: event, error: fetchError } = await supabaseAdmin
+      .from('events')
+      .select('id, created_by, name')
+      .eq('id', req.params.id)
+      .single()
+    
+    if (fetchError || !event) {
+      console.log('Event not found or fetch error:', fetchError)
+      return res.status(404).json({ error: 'Event not found' })
+    }
+    
+    console.log('Event found:', event)
+    console.log('Event created_by:', event.created_by)
+    console.log('User ID:', req.user!.id)
+    console.log('IDs match:', event.created_by === req.user!.id)
+    
+    return res.json({
+      event,
+      user: req.user,
+      canDelete: event.created_by === req.user!.id
+    })
+  } catch (error) {
+    console.error('Test error:', error)
+    res.status(500).json({ error: 'Test failed' })
+  }
+})
+
 // Delete event
 router.delete('/:id', authMiddleware, async (req: AuthRequest, res) => {
   try {
-    const { error } = await supabase
+    console.log('Attempting to delete event:', req.params.id)
+    console.log('User ID:', req.user!.id)
+    
+    // First check if the event exists and user owns it
+    const { data: event, error: fetchError } = await supabaseAdmin
+      .from('events')
+      .select('id, created_by')
+      .eq('id', req.params.id)
+      .single()
+    
+    if (fetchError || !event) {
+      console.log('Event not found or fetch error:', fetchError)
+      return res.status(404).json({ error: 'Event not found' })
+    }
+    
+    if (event.created_by !== req.user!.id) {
+      console.log('User not authorized to delete this event')
+      return res.status(403).json({ error: 'Not authorized to delete this event' })
+    }
+    
+    // Delete the event using supabaseAdmin to bypass RLS
+    const { error } = await supabaseAdmin
       .from('events')
       .delete()
       .eq('id', req.params.id)
-      .eq('created_by', req.user!.id)
     
-    if (error) throw error
+    if (error) {
+      console.error('Supabase delete error:', error)
+      throw error
+    }
+    
+    console.log('Event deleted successfully')
     res.status(204).send()
   } catch (error) {
-    res.status(400).json({ error: 'Failed to delete event' })
+    console.error('Error deleting event:', error)
+    res.status(500).json({ error: 'Failed to delete event' })
   }
 })
 

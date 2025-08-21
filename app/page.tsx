@@ -59,9 +59,11 @@ export default function HomePage() {
     }
 
     try {
-      await apiFetch(`/events/${eventId}`, {
+      console.log('Attempting to delete event:', eventId)
+      const response = await apiFetch(`/events/${eventId}`, {
         method: 'DELETE'
       })
+      console.log('Delete response:', response)
       
       // Remove the event from the local state
       setEvents(events.filter(event => event.id !== eventId))
